@@ -1079,15 +1079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ratatui-counter"
-version = "0.1.0"
-dependencies = [
- "color-eyre",
- "crossterm",
- "ratatui",
-]
-
-[[package]]
 name = "ratatui-crossterm"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1590,6 +1581,15 @@ dependencies = [
  "sharded-slab",
  "thread_local",
  "tracing-core",
+]
+
+[[package]]
+name = "tsk"
+version = "0.1.0"
+dependencies = [
+ "color-eyre",
+ "crossterm",
+ "ratatui",
 ]
 
 [[package]]

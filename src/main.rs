@@ -1,5 +1,5 @@
 use color_eyre::eyre::Result;
-use ratatui_counter::{app::App, tui};
+use tsk::{app::App, tui};
 
 fn main() -> Result<()> {
     tui::install_panic_hook();
