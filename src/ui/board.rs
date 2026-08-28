@@ -29,9 +29,9 @@ impl<'a> StatefulWidget for Board<'a> {
     type State = BoardState;
 
     fn render(self, area: Rect, buf: &mut ratatui::prelude::Buffer, state: &mut Self::State) {
-        let items = state.items.iter().map(|item| item.content());
+        let tasks = state.tasks.iter().map(|task| task.content());
         let board_title = state.title.clone();
-        let list = List::new(items)
+        let list = List::new(tasks)
             .style(Style::default().fg(Color::Cyan))
             .block(self.block.title(board_title).style(self.style))
             .highlight_style(Modifier::REVERSED)

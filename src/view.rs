@@ -1,8 +1,8 @@
 use ratatui::Frame;
 
 use crate::{
-    models::AppModelState,
-    ui::{AppModel, Board, Item},
+    models::{AppModelState, ScreenState},
+    ui::{AppModel, Board, Task, TextInput},
 };
 
 pub fn view(model: &mut AppModelState, frame: &mut Frame) {
@@ -13,27 +13,36 @@ pub fn view(model: &mut AppModelState, frame: &mut Frame) {
     // };
     // frame.render_widget(Paragraph::new(board_title), frame.area());
     let app = AppModel::new("TSK");
+    if model.is_inputing() {
+        let text_input = TextInput::new();
+        frame.render_stateful_widget(text_input, frame.area(), &mut model.text_input_state);
 
-    match model.screen_state() {
-        crate::models::ScreenState::AllBoards => {
-            frame.render_stateful_widget(app, frame.area(), model);
-        }
-        crate::models::ScreenState::Board(board_index) => {
-            let board = Board::new();
-            let board_state = model.boards.get_mut(board_index).unwrap();
-            frame.render_stateful_widget(board, frame.area(), board_state);
-        }
-        crate::models::ScreenState::Task(board_index, task_index) => {
-            let item = Item::new();
-            let item_state = model
-                .boards
-                .get_mut(board_index)
-                .unwrap()
-                .items
-                .get_mut(task_index)
-                .unwrap();
+        frame.set_cursor_position((
+            frame.area().x + model.text_input_state.cursor() + 1,
+            frame.area().y + 1,
+        ));
+    } else {
+        match model.screen_state() {
+            ScreenState::AllBoards => {
+                frame.render_stateful_widget(app, frame.area(), model);
+            }
+            ScreenState::Board(board_index) => {
+                let board = Board::new();
+                let board_state = model.boards.get_mut(board_index).unwrap();
+                frame.render_stateful_widget(board, frame.area(), board_state);
+            }
+            ScreenState::Task(board_index, task_index) => {
+                let task = Task::new();
+                let task_state = model
+                    .boards
+                    .get_mut(board_index)
+                    .unwrap()
+                    .tasks
+                    .get_mut(task_index)
+                    .unwrap();
 
-            frame.render_stateful_widget(item, frame.area(), item_state);
+                frame.render_stateful_widget(task, frame.area(), task_state);
+            }
         }
     }
 }

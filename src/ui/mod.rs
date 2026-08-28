@@ -1,7 +1,9 @@
 mod app;
 mod board;
-mod item;
+mod components;
+mod task;
 
 pub use app::*;
 pub use board::*;
-pub use item::*;
+pub use components::*;
+pub use task::*;

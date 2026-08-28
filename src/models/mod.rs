@@ -1,7 +1,7 @@
 mod app;
 mod board;
-mod item;
+mod task;
 
 pub use app::*;
 pub use board::*;
-pub use item::*;
+pub use task::*;

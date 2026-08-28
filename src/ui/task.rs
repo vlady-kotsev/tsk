@@ -3,14 +3,14 @@ use ratatui::{
     widgets::{Block, BorderType, Paragraph, StatefulWidget, Widget},
 };
 
-use crate::models::ItemState;
+use crate::models::TaskState;
 
-pub struct Item<'a> {
+pub struct Task<'a> {
     block: Block<'a>,
     style: Style,
 }
 
-impl<'a> Item<'a> {
+impl<'a> Task<'a> {
     pub fn new() -> Self {
         let block = Block::bordered().border_type(BorderType::Thick);
 
@@ -21,8 +21,8 @@ impl<'a> Item<'a> {
     }
 }
 
-impl<'a> StatefulWidget for Item<'a> {
-    type State = ItemState;
+impl<'a> StatefulWidget for Task<'a> {
+    type State = TaskState;
 
     fn render(
         self,

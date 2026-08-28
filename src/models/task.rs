@@ -1,10 +1,10 @@
 #[derive(Debug)]
-pub struct ItemState {
+pub struct TaskState {
     _index: usize,
     content: String,
 }
 
-impl ItemState {
+impl TaskState {
     pub fn new(index: usize, content: String) -> Self {
         Self {
             _index: index,

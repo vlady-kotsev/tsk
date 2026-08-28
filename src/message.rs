@@ -1,7 +1,7 @@
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub enum ChangeScreenDirection {
-    In,
-    Out,
+pub enum Direction {
+    Right,
+    Left,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -9,6 +9,10 @@ pub enum Message {
     Up,
     Down,
     Quit,
-    ChangeScreen(ChangeScreenDirection),
+    Direction(Direction),
     Create,
+    Input(char),
+    InputDelete,
+    InputMove(Direction),
+    InputDone,
 }

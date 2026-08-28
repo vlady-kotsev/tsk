@@ -1,11 +1,11 @@
 use ratatui::widgets::ListState;
 
-use crate::models::ItemState;
+use crate::models::TaskState;
 
 #[derive(Debug)]
 pub struct BoardState {
     pub title: String,
-    pub items: Vec<ItemState>,
+    pub tasks: Vec<TaskState>,
     pub list_state: ListState,
 }
 
@@ -13,7 +13,7 @@ impl BoardState {
     pub fn new(title: String) -> Self {
         Self {
             title,
-            items: vec![],
+            tasks: vec![],
             list_state: ListState::default(),
         }
     }
@@ -23,8 +23,8 @@ impl BoardState {
     }
 
     pub fn create_task(&mut self, task_content: String) {
-        let index = self.items.len();
-        let item = ItemState::new(index, task_content);
-        self.items.push(item);
+        let index = self.tasks.len();
+        let task = TaskState::new(index, task_content);
+        self.tasks.push(task);
     }
 }
