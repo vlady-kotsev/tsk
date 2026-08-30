@@ -1,6 +1,7 @@
+use color_eyre::{Result, eyre::OptionExt};
 use ratatui::widgets::ListState;
 
-use crate::{message::Direction, models::BoardState, ui::TextInputState};
+use crate::{message::DirectionX, models::BoardState, persistence, ui::TextInputState};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
@@ -19,7 +20,7 @@ pub enum ScreenState {
     Task(usize, usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AppModelState {
     running_state: RunningState,
     screen_state: ScreenState,
@@ -30,18 +31,28 @@ pub struct AppModelState {
 }
 
 impl AppModelState {
-    pub fn new() -> Self {
-        Self {
+    pub fn load() -> Result<Self> {
+        let boards = persistence::load_boards()?;
+        Ok(Self {
             running_state: RunningState::Running,
             screen_state: ScreenState::AllBoards,
-            boards: vec![],
+            boards,
             list_state: ListState::default(),
             text_input_state: TextInputState::new(),
             is_inputing: false,
-        }
+        })
     }
-    pub fn create_board(&mut self, title: String) {
-        self.boards.push(BoardState::new(title));
+    pub fn create_board(&mut self, title: String) -> Option<BoardState> {
+        if title.is_empty() {
+            return None;
+        }
+        let board = BoardState::new(title);
+        self.boards.push(board.clone());
+        Some(board)
+    }
+
+    pub fn remove_board(&mut self, board_index: usize) {
+        self.boards.remove(board_index);
     }
 
     pub fn running_state(&self) -> RunningState {
@@ -56,10 +67,6 @@ impl AppModelState {
         self.screen_state
     }
 
-    pub fn set_screen_state(&mut self, state: ScreenState) {
-        self.screen_state = state;
-    }
-
     pub fn is_inputing(&self) -> bool {
         self.is_inputing
     }
@@ -68,43 +75,54 @@ impl AppModelState {
         self.is_inputing = is_inputing;
     }
 
-    pub fn transition_state(&mut self, direction: Direction) {
+    pub fn transition_state(&mut self, direction: DirectionX) -> Result<()> {
         match self.screen_state {
             ScreenState::AllBoards => {
-                if direction == Direction::Right {
-                    if let Some(board_index) = self.list_state.selected() {
-                        self.screen_state = ScreenState::Board(board_index);
-                    }
+                if direction == DirectionX::Right
+                    && let Some(board_index) = self.list_state.selected()
+                {
+                    self.screen_state = ScreenState::Board(board_index);
                 }
             }
             ScreenState::Board(board_index) => match direction {
-                Direction::Right => {
-                    if let Some(task_index) =
-                        self.boards.get(board_index).unwrap().list_state.selected()
+                DirectionX::Right => {
+                    if let Some(task_index) = self
+                        .get_board_at(board_index)
+                        .ok_or_eyre("board not found")?
+                        .list_state
+                        .selected()
                     {
                         self.screen_state = ScreenState::Task(board_index, task_index);
                     }
                 }
-                Direction::Left => {
+                DirectionX::Left => {
                     self.screen_state = ScreenState::AllBoards;
                 }
             },
             ScreenState::Task(board_index, _) => {
-                if direction == Direction::Left {
+                if direction == DirectionX::Left {
                     self.screen_state = ScreenState::Board(board_index);
                 }
             }
-        }
+        };
+        Ok(())
     }
 
     pub fn get_board_at(&mut self, board_index: usize) -> Option<&mut BoardState> {
         if board_index >= self.boards.len() {
             return None;
         }
-        Some(
-            self.boards
-                .get_mut(board_index)
-                .expect("this should be here"),
-        )
+
+        self.boards.get_mut(board_index)
+    }
+
+    pub fn swap_boards(&mut self, first_board_index: usize, second_board_index: usize) {
+        if !(0..self.boards.len()).contains(&first_board_index)
+            || !(0..self.boards.len()).contains(&second_board_index)
+        {
+            return;
+        }
+
+        self.boards.swap(first_board_index, second_board_index);
     }
 }

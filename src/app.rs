@@ -2,60 +2,61 @@ use color_eyre::eyre::Result;
 use ratatui::Terminal;
 use ratatui::backend::Backend;
 
-use crate::event::EventHandler;
-use crate::message::{Direction, Message};
+use crate::event;
+use crate::message::{DirectionX, DirectionY, Message};
 use crate::models::{AppModelState, RunningState, ScreenState};
+use crate::persistence::{self, PersistMessage};
 use crate::view;
 use std::cell::RefCell;
 
-use std::sync::mpsc::{SyncSender, channel, sync_channel};
+use std::io;
+use std::sync::Arc;
+use std::sync::mpsc::{Sender, SyncSender, channel, sync_channel};
 use std::time;
-use std::{io, thread};
 
+#[derive(Default)]
 pub struct App {
     model: AppModelState,
     done_sender: Option<SyncSender<()>>,
+    persist_msg_sender: Option<Sender<PersistMessage>>,
 }
 
 impl App {
-    pub fn new() -> Self {
-        let model = AppModelState::new();
+    pub fn new() -> Result<Self> {
+        let model = AppModelState::load()?;
 
-        Self {
+        Ok(Self {
             model,
             done_sender: None,
-        }
+            persist_msg_sender: None,
+        })
     }
 
     pub fn run(&mut self, terminal: &mut Terminal<impl Backend<Error = io::Error>>) -> Result<()> {
         let (done_sender, done_receiver) = sync_channel::<()>(1);
         let (msg_sender, msg_receiver) = channel::<Message>();
+        let (persist_msg_sender, persist_msg_receiver) = channel::<PersistMessage>();
 
+        self.persist_msg_sender.replace(persist_msg_sender);
         self.done_sender.replace(done_sender);
 
-        let mut event_handler = EventHandler::new(msg_sender, done_receiver);
+        let persistenc_thread_handle = persistence::run(persist_msg_receiver)?;
 
-        let event_thread_handle = thread::spawn(move || {
-            event_handler
-                .listen()
-                .expect("event handler failed to listen");
-        });
+        let event_thread_handle = event::run(msg_sender, done_receiver);
 
         while self.model.running_state() != RunningState::Done {
-            // Render the current view
-            terminal.draw(|f| view::view(&mut self.model, f))?;
+            terminal.draw(|f| view::view(&mut self.model, f).expect("failed to draw view"))?;
 
-            // Handle events and map to a Message
             let mut current_msg = msg_receiver
                 .recv_timeout(time::Duration::from_millis(250))
                 .ok();
 
-            // Process updates as long as they return a non-None message
-            while current_msg.is_some() {
-                current_msg = self.update(current_msg.unwrap());
+            while let Some(msg) = current_msg {
+                current_msg = self.update(msg);
             }
         }
         event_thread_handle.join().unwrap();
+        let _ = persistenc_thread_handle.join().unwrap();
         Ok(())
     }
 
@@ -68,9 +69,7 @@ impl App {
                     }
                     ScreenState::Board(board_index) => {
                         self.model
-                            .boards
-                            .get_mut(board_index)
-                            .unwrap()
+                            .get_board_at(board_index)?
                             .list_state
                             .select_previous();
                     }
@@ -94,11 +93,14 @@ impl App {
                 return Some(Message::Input('j'));
             }
             Message::Direction(direction) => {
-                self.model.transition_state(direction);
-
+                if !self.model.is_inputing() {
+                    if self.model.transition_state(direction).is_err() {
+                        return None;
+                    }
+                }
                 match direction {
-                    Direction::Right => return Some(Message::Input('l')),
-                    Direction::Left => return Some(Message::Input('h')),
+                    DirectionX::Right => return Some(Message::Input('l')),
+                    DirectionX::Left => return Some(Message::Input('h')),
                 };
             }
             Message::Create => {
@@ -132,8 +134,8 @@ impl App {
             }
             Message::InputMove(direction) => {
                 match direction {
-                    Direction::Right => self.model.text_input_state.move_right(),
-                    Direction::Left => self.model.text_input_state.move_left(),
+                    DirectionX::Right => self.model.text_input_state.move_right(),
+                    DirectionX::Left => self.model.text_input_state.move_left(),
                 };
                 return None;
             }
@@ -141,26 +143,106 @@ impl App {
                 let text = RefCell::new(self.model.text_input_state.take_text());
                 match self.model.screen_state() {
                     ScreenState::Board(board_index) => {
-                        self.model
-                            .boards
-                            .get_mut(board_index)
-                            .unwrap()
-                            .create_task(text.borrow_mut().to_string());
+                        let board = self.model.get_board_at(board_index)?;
+                        let board_id = board.id();
+                        let task = board.create_task(text.borrow_mut().to_string());
+
+                        if let Some(task) = task
+                            && let Some(sender) = self.persist_msg_sender.as_ref()
+                        {
+                            let _ =
+                                sender.send(PersistMessage::CreateTask(board_id, Arc::new(task)));
+                        }
                     }
                     ScreenState::AllBoards => {
-                        self.model.create_board(text.borrow_mut().to_string());
+                        let board = self.model.create_board(text.borrow_mut().to_string());
+                        if let Some(board) = board
+                            && let Some(sender) = self.persist_msg_sender.as_ref()
+                        {
+                            let _ = sender.send(PersistMessage::CreateBoard(Arc::new(board)));
+                        }
                     }
                     _ => return None,
                 };
                 self.model.set_is_inputing(false);
                 return None;
             }
+            Message::InputCancel => {
+                self.model.text_input_state.reset();
+                self.model.set_is_inputing(false);
+                return None;
+            }
+            Message::Delete => {
+                if self.model.is_inputing() {
+                    return Some(Message::Input('d'));
+                }
+                match self.model.screen_state() {
+                    ScreenState::Board(board_index) => {
+                        let board = self.model.get_board_at(board_index)?;
+                        let task_index = board.list_state.selected()?;
+                        let task_id = board.get_task_at(task_index)?.id();
+                        board.remove_task(task_index);
+
+                        if let Some(sender) = self.persist_msg_sender.as_ref() {
+                            let _ = sender.send(PersistMessage::DeleteTask(task_id));
+                        }
+                    }
+                    ScreenState::AllBoards => {
+                        let board_index = self.model.list_state.selected()?;
+                        if !self.model.get_board_at(board_index)?.tasks.is_empty() {
+                            return None;
+                        }
+                        let board_id = self.model.get_board_at(board_index)?.id();
+                        self.model.remove_board(board_index);
+
+                        if let Some(sender) = self.persist_msg_sender.as_ref() {
+                            let _ = sender.send(PersistMessage::DeleteBoard(board_id));
+                        }
+                    }
+                    _ => return None,
+                };
+            }
+            Message::MoveOrder(direction_y) => {
+                match self.model.screen_state() {
+                    ScreenState::Board(board_index) => {
+                        let board = self.model.get_board_at(board_index)?;
+                        let task_index = board.list_state.selected()?;
+
+                        match direction_y {
+                            DirectionY::Up => {
+                                board.swap_tasks(task_index, task_index.checked_sub_signed(1)?)
+                            }
+                            DirectionY::Down => {
+                                board.swap_tasks(task_index, task_index.checked_add_signed(1)?)
+                            }
+                        }
+                    }
+                    ScreenState::AllBoards => {
+                        let board_index = self.model.list_state.selected()?;
+
+                        match direction_y {
+                            DirectionY::Up => self
+                                .model
+                                .swap_boards(board_index, board_index.checked_sub_signed(1)?),
+
+                            DirectionY::Down => self
+                                .model
+                                .swap_boards(board_index, board_index.checked_add_signed(1)?),
+                        }
+                    }
+                    _ => return None,
+                };
+            }
         };
+        None
     }
 
     pub fn exit_event_loop(&self) {
         if let Some(done_chan) = &self.done_sender {
             done_chan.send(()).expect("coundn't exit event loop");
+        }
+        if let Some(sender) = &self.persist_msg_sender {
+            let _ = sender.send(PersistMessage::QuitPersister);
         }
     }
 }

@@ -1,8 +1,8 @@
-pub mod app;
-pub mod event;
+mod app;
+mod event;
 mod message;
-pub mod model;
-pub mod models;
+mod models;
+mod persistence;
 pub mod tui;
 mod ui;
-pub mod view;
+mod view;

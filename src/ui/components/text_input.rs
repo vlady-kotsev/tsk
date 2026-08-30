@@ -1,8 +1,13 @@
-use ratatui::widgets::{Block, BorderType, Paragraph, StatefulWidget, Widget};
+use ratatui::{
+    style::{Color, Style},
+    widgets::{Block, BorderType, Paragraph, StatefulWidget, Widget},
+};
 
-#[derive(Debug)]
+use crate::ui::theme::{WIN95_BLUE, title_bar_style};
+
+#[derive(Debug, Default)]
 pub struct TextInputState {
-    cursor: usize,
+    cursor: u16,
     text: Option<Vec<u8>>,
 }
 
@@ -19,10 +24,10 @@ impl TextInputState {
     }
 
     pub fn move_right(&mut self) {
-        if let Some(ref text) = self.text {
-            if self.cursor + 1 < text.len() {
-                self.cursor += 1;
-            }
+        if let Some(ref text) = self.text
+            && self.cursor as usize + 1 < text.len()
+        {
+            self.cursor += 1;
         }
     }
 
@@ -38,17 +43,17 @@ impl TextInputState {
 
     pub fn insert(&mut self, input: u8) {
         if let Some(ref mut text) = self.text {
-            text.insert(self.cursor, input);
+            text.insert(self.cursor as usize, input);
             self.cursor += 1;
         }
     }
 
     pub fn delete(&mut self) {
-        if let Some(ref mut text) = self.text {
-            if self.cursor > 0 {
-                text.remove(self.cursor - 1);
-                self.cursor -= 1;
-            }
+        if let Some(ref mut text) = self.text
+            && self.cursor > 0
+        {
+            text.remove(self.cursor as usize - 1);
+            self.cursor -= 1;
         }
     }
 
@@ -59,17 +64,16 @@ impl TextInputState {
 }
 
 pub struct TextInput<'a> {
-    pub block: Block<'a>,
+    title: &'a str,
 }
 
 impl<'a> TextInput<'a> {
-    pub fn new() -> Self {
-        let block = Block::bordered().border_type(BorderType::Thick);
-        Self { block }
+    pub fn new(title: &'a str) -> Self {
+        Self { title }
     }
 }
 
-impl<'a> StatefulWidget for TextInput<'a> {
+impl StatefulWidget for TextInput<'_> {
     type State = TextInputState;
 
     fn render(
@@ -78,11 +82,17 @@ impl<'a> StatefulWidget for TextInput<'a> {
         buf: &mut ratatui::prelude::Buffer,
         state: &mut Self::State,
     ) {
+        let block = Block::bordered()
+            .border_type(BorderType::Double)
+            .border_style(Style::default().fg(WIN95_BLUE))
+            .title(format!(" {} ", self.title))
+            .title_style(title_bar_style());
+
         Paragraph::new(
             String::from_utf8(state.text.clone().unwrap_or_default()).expect("Invalid input"),
         )
-        .block(self.block)
-        // .style(self.style)
+        .style(Style::default().fg(Color::Magenta).bold())
+        .block(block)
         .render(area, buf);
     }
 }

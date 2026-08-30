@@ -1,7 +1,13 @@
 #[derive(PartialEq, Clone, Copy, Debug)]
-pub enum Direction {
+pub enum DirectionX {
     Right,
     Left,
+}
+
+#[derive(PartialEq, Clone, Copy, Debug)]
+pub enum DirectionY {
+    Up,
+    Down,
 }
 
 #[derive(PartialEq, Clone, Copy)]
@@ -9,10 +15,13 @@ pub enum Message {
     Up,
     Down,
     Quit,
-    Direction(Direction),
+    Direction(DirectionX),
     Create,
     Input(char),
     InputDelete,
-    InputMove(Direction),
+    InputMove(DirectionX),
     InputDone,
+    InputCancel,
+    Delete,
+    MoveOrder(DirectionY),
 }

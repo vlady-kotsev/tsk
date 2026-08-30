@@ -1,14 +1,15 @@
 use std::{
     sync::mpsc::{Receiver, TryRecvError},
+    thread::{self, JoinHandle},
     time::Duration,
 };
 
-use crate::message::{Direction, Message};
+use crate::message::{DirectionX, DirectionY, Message};
 use color_eyre::eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use std::sync::mpsc::Sender;
 
-pub struct EventHandler {
+struct EventHandler {
     event_channel: Sender<Message>,
     done_channel: Receiver<()>,
 }
@@ -16,14 +17,14 @@ pub struct EventHandler {
 const TIMEOUT: Duration = Duration::from_millis(250);
 
 impl EventHandler {
-    pub fn new(event_channel: Sender<Message>, done_channel: Receiver<()>) -> Self {
+    fn new(event_channel: Sender<Message>, done_channel: Receiver<()>) -> Self {
         Self {
             event_channel,
             done_channel,
         }
     }
 
-    pub fn listen(&mut self) -> Result<()> {
+    fn listen(&mut self) -> Result<()> {
         loop {
             if matches!(
                 self.done_channel.try_recv(),
@@ -35,22 +36,21 @@ impl EventHandler {
             if event::poll(TIMEOUT)?
                 && let Event::Key(key) = event::read()?
                 && key.kind == event::KeyEventKind::Press
+                && let Some(msg) = handle_key(key)
             {
-                if let Some(msg) = handle_key(key) {
-                    self.event_channel.send(msg)?;
-                }
+                self.event_channel.send(msg)?;
             }
         }
     }
 }
 
-pub fn handle_key(key: event::KeyEvent) -> Option<Message> {
+fn handle_key(key: event::KeyEvent) -> Option<Message> {
     match key.code {
         KeyCode::Char('j') => Some(Message::Down),
         KeyCode::Char('k') => Some(Message::Up),
         KeyCode::Char('q') => Some(Message::Quit),
-        KeyCode::Char('l') => Some(Message::Direction(Direction::Right)),
-        KeyCode::Char('h') => Some(Message::Direction(Direction::Left)),
+        KeyCode::Char('l') => Some(Message::Direction(DirectionX::Right)),
+        KeyCode::Char('h') => Some(Message::Direction(DirectionX::Left)),
         KeyCode::Char('c') => {
             if key.modifiers.contains(KeyModifiers::CONTROL) {
                 Some(Message::Quit)
@@ -59,11 +59,24 @@ pub fn handle_key(key: event::KeyEvent) -> Option<Message> {
             }
         }
         KeyCode::Char('n') => Some(Message::Create),
+        KeyCode::Char('d') => Some(Message::Delete),
         KeyCode::Char(other) => Some(Message::Input(other)),
         KeyCode::Backspace => Some(Message::InputDelete),
-        KeyCode::Left => Some(Message::InputMove(Direction::Left)),
-        KeyCode::Right => Some(Message::InputMove(Direction::Right)),
+        KeyCode::Left => Some(Message::InputMove(DirectionX::Left)),
+        KeyCode::Right => Some(Message::InputMove(DirectionX::Right)),
         KeyCode::Enter => Some(Message::InputDone),
+        KeyCode::Esc => Some(Message::InputCancel),
+        KeyCode::Up => Some(Message::MoveOrder(DirectionY::Up)),
+        KeyCode::Down => Some(Message::MoveOrder(DirectionY::Down)),
         _ => None,
     }
+}
+
+pub fn run(msg_sender: Sender<Message>, done_receiver: Receiver<()>) -> JoinHandle<()> {
+    let mut event_handler = EventHandler::new(msg_sender, done_receiver);
+    thread::spawn(move || {
+        event_handler
+            .listen()
+            .expect("event handler failed to listen");
+    })
 }

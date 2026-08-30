@@ -1,22 +1,31 @@
-#[derive(Debug)]
+use uuid::Uuid;
+
+#[derive(Debug, Clone)]
 pub struct TaskState {
-    _index: usize,
+    id: Uuid,
     content: String,
 }
 
 impl TaskState {
-    pub fn new(index: usize, content: String) -> Self {
+    #[must_use]
+    pub fn new(content: String) -> Self {
         Self {
-            _index: index,
+            id: Uuid::new_v4(),
             content,
         }
     }
 
-    pub fn content(&self) -> &str {
-        &self.content
+    #[must_use]
+    pub fn from_parts(id: Uuid, content: String) -> Self {
+        Self { id, content }
     }
 
-    pub fn set_content(&mut self, content: String) {
-        self.content = content;
+    pub fn id(&self) -> Uuid {
+        self.id
+    }
+
+    #[must_use]
+    pub fn content(&self) -> &str {
+        &self.content
     }
 }
