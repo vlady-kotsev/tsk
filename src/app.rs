@@ -61,83 +61,39 @@ impl App {
     }
 
     fn update(&mut self, msg: Message) -> Option<Message> {
-        match msg {
-            Message::Up => {
-                match self.model.screen_state() {
-                    ScreenState::AllBoards => {
-                        self.model.list_state.select_previous();
-                    }
-                    ScreenState::Board(board_index) => {
-                        self.model
-                            .get_board_at(board_index)?
-                            .list_state
-                            .select_previous();
-                    }
-                    _ => {}
-                };
-                return Some(Message::Input('k'));
-            }
-            Message::Down => {
-                match self.model.screen_state() {
-                    ScreenState::AllBoards => {
-                        self.model.list_state.select_next();
-                    }
-                    ScreenState::Board(board_index) => {
-                        self.model
-                            .get_board_at(board_index)?
-                            .list_state
-                            .select_next();
-                    }
-                    _ => {}
-                };
-                return Some(Message::Input('j'));
-            }
-            Message::Direction(direction) => {
-                if !self.model.is_inputing() {
-                    if self.model.transition_state(direction).is_err() {
-                        return None;
-                    }
-                }
-                match direction {
-                    DirectionX::Right => return Some(Message::Input('l')),
-                    DirectionX::Left => return Some(Message::Input('h')),
-                };
-            }
-            Message::Create => {
-                if self.model.is_inputing() {
-                    return Some(Message::Input('n'));
-                } else {
-                    self.model.set_is_inputing(true);
-                    return None;
-                }
-            }
-            Message::Quit => {
-                if !self.model.is_inputing() {
-                    self.model.set_running_state(RunningState::Done);
-                    self.exit_event_loop();
-                    return None;
-                }
-                return Some(Message::Input('q'));
-            }
-            Message::Input(c) => {
-                if self.model.is_inputing() {
-                    self.model.text_input_state.insert(c as u8);
-                }
+        if self.model.is_inputing() {
+            self.update_inputing(msg)
+        } else {
+            self.update_navigating(msg)
+        }
+    }
 
-                return None;
+    fn update_inputing(&mut self, msg: Message) -> Option<Message> {
+        match msg {
+            Message::Up => Some(Message::Input('k')),
+            Message::Down => Some(Message::Input('j')),
+            Message::Direction(direction) => match direction {
+                DirectionX::Right => Some(Message::Input('l')),
+                DirectionX::Left => Some(Message::Input('h')),
+            },
+            Message::Create => Some(Message::Input('n')),
+            Message::Quit(c) => Some(Message::Input(c)),
+            Message::Delete => Some(Message::Input('d')),
+            Message::MoveOrder(_) => None,
+            Message::Input(c) => {
+                self.model.text_input_state.insert(c as u8);
+                None
             }
             Message::InputDelete => {
-                if self.model.is_inputing() {
-                    self.model.text_input_state.delete();
-                }
-                return None;
+                self.model.text_input_state.delete();
+                None
             }
             Message::InputMove(direction) => {
                 match direction {
                     DirectionX::Right => self.model.text_input_state.move_right(),
                     DirectionX::Left => self.model.text_input_state.move_left(),
                 };
-                return None;
+                None
             }
             Message::InputDone => {
                 let text = RefCell::new(self.model.text_input_state.take_text());
@@ -165,17 +121,78 @@ impl App {
                     _ => return None,
                 };
                 self.model.set_is_inputing(false);
-                return None;
+                None
             }
             Message::InputCancel => {
                 self.model.text_input_state.reset();
                 self.model.set_is_inputing(false);
-                return None;
+                None
             }
-            Message::Delete => {
-                if self.model.is_inputing() {
-                    return Some(Message::Input('d'));
+        }
+    }
+
+    fn update_navigating(&mut self, msg: Message) -> Option<Message> {
+        match msg {
+            Message::Up => {
+                match self.model.screen_state() {
+                    ScreenState::AllBoards => {
+                        self.model.list_state.select_previous();
+                    }
+                    ScreenState::Board(board_index) => {
+                        self.model
+                            .get_board_at(board_index)?
+                            .list_state
+                            .select_previous();
+                    }
+                    _ => {}
+                };
+                Some(Message::Input('k'))
+            }
+            Message::Down => {
+                match self.model.screen_state() {
+                    ScreenState::AllBoards => {
+                        self.model.list_state.select_next();
+                    }
+                    ScreenState::Board(board_index) => {
+                        self.model
+                            .get_board_at(board_index)?
+                            .list_state
+                            .select_next();
+                    }
+                    _ => {}
+                };
+                Some(Message::Input('j'))
+            }
+            Message::Direction(direction) => {
+                if self.model.transition_state(direction).is_err() {
+                    return None;
                 }
+                match direction {
+                    DirectionX::Right => Some(Message::Input('l')),
+                    DirectionX::Left => Some(Message::Input('h')),
+                }
+            }
+            Message::Create => {
+                self.model.set_is_inputing(true);
+                None
+            }
+            Message::Quit(c) => {
+                self.model.set_running_state(RunningState::Done);
+                self.exit_event_loop();
+                Some(Message::Input(c))
+            }
+            Message::Input(_) => None,
+            Message::InputDelete => None,
+            Message::InputMove(direction) => {
+                match direction {
+                    DirectionX::Right => self.model.text_input_state.move_right(),
+                    DirectionX::Left => self.model.text_input_state.move_left(),
+                };
+                None
+            }
+            Message::InputDone => None,
+            Message::InputCancel => None,
+            Message::Delete => {
                 match self.model.screen_state() {
                     ScreenState::Board(board_index) => {
                         let board = self.model.get_board_at(board_index)?;
@@ -201,6 +218,7 @@ impl App {
                     }
                     _ => return None,
                 };
+                None
             }
             Message::MoveOrder(direction_y) => {
                 match self.model.screen_state() {
@@ -232,9 +250,9 @@ impl App {
                     }
                     _ => return None,
                 };
+                None
             }
-        };
-        None
+        }
     }
 
     pub fn exit_event_loop(&self) {

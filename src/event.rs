@@ -48,14 +48,14 @@ fn handle_key(key: event::KeyEvent) -> Option<Message> {
     match key.code {
         KeyCode::Char('j') => Some(Message::Down),
         KeyCode::Char('k') => Some(Message::Up),
-        KeyCode::Char('q') => Some(Message::Quit),
+        KeyCode::Char('q') => Some(Message::Quit('q')),
         KeyCode::Char('l') => Some(Message::Direction(DirectionX::Right)),
         KeyCode::Char('h') => Some(Message::Direction(DirectionX::Left)),
         KeyCode::Char('c') => {
             if key.modifiers.contains(KeyModifiers::CONTROL) {
-                Some(Message::Quit)
+                Some(Message::Quit('c'))
             } else {
-                None
+                Some(Message::Input('c'))
             }
         }
         KeyCode::Char('n') => Some(Message::Create),

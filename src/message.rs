@@ -14,7 +14,7 @@ pub enum DirectionY {
 pub enum Message {
     Up,
     Down,
-    Quit,
+    Quit(char),
     Direction(DirectionX),
     Create,
     Input(char),
