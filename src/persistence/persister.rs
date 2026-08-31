@@ -1,4 +1,6 @@
 use std::{
+    env, fs,
+    path::PathBuf,
     sync::{Arc, mpsc::Receiver},
     thread::{self, JoinHandle},
 };
@@ -9,7 +11,7 @@ use uuid::Uuid;
 
 use crate::models::{BoardState, TaskState};
 
-const DB_PATH: &str = "src/persistence/db/db.sqlite3";
+const DB_PATH: &str = ".tsk/db/db.sqlite3";
 
 const CREATE_SCHEMA: &str = include_str!("sql/schema.sql");
 const CREATE_BOARD_SQL: &str = include_str!("sql/create_board.sql");
@@ -18,53 +20,6 @@ const CREATE_TASK_SQL: &str = include_str!("sql/create_task.sql");
 const DELETE_TASK_SQL: &str = include_str!("sql/delete_task.sql");
 const GET_ALL_BOARDS_SQL: &str = include_str!("sql/get_all_boards.sql");
 const GET_TASKS_BY_BOARD_SQL: &str = include_str!("sql/get_tasks_by_board.sql");
-/*
-
-
-
-#[derive(Debug)]
-struct Person {
-    id: i32,
-    name: String,
-    data: Option<Vec<u8>>,
-}
-
-fn main() -> Result<()> {
-
-
-    conn.execute(
-        "CREATE TABLE person (
-            id    INTEGER PRIMARY KEY,
-            name  TEXT NOT NULL,
-            data  BLOB
-        )",
-        (), // empty list of parameters.
-    )?;
-    let me = Person {
-        id: 0,
-        name: "Steven".to_string(),
-        data: None,
-    };
-    conn.execute(
-        "INSERT INTO person (name, data) VALUES (?1, ?2)",
-        (&me.name, &me.data),
-    )?;
-
-    let mut stmt = conn.prepare("SELECT id, name, data FROM person")?;
-    let person_iter = stmt.query_map([], |row| {
-        Ok(Person {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            data: row.get(2)?,
-        })
-    })?;
-
-    for person in person_iter {
-        println!("Found person {:?}", person.unwrap());
-    }
-    Ok(())
-}
-*/
 
 pub enum PersistMessage {
     CreateTask(Uuid, Arc<TaskState>),
@@ -76,13 +31,12 @@ pub enum PersistMessage {
 
 struct Persister {
     db: Connection,
-
     persist_chan: Receiver<PersistMessage>,
 }
 
 impl Persister {
     fn new(persist_chan: Receiver<PersistMessage>) -> Result<Self> {
-        let db = Connection::open(DB_PATH)?;
+        let db = open_db()?;
         let persister = Self { db, persist_chan };
         persister.init_db()?;
         Ok(persister)
@@ -118,8 +72,27 @@ impl Persister {
     }
 }
 
+fn get_db_path() -> PathBuf {
+    match env::var("TSK_DB_PATH") {
+        Ok(val) => PathBuf::from(val),
+        Err(_) => match dirs::home_dir() {
+            Some(home) => home.join(DB_PATH),
+            None => PathBuf::from(DB_PATH),
+        },
+    }
+}
+
+fn open_db() -> Result<Connection> {
+    let db_path = get_db_path();
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    Ok(Connection::open(db_path)?)
+}
+
 pub fn load_boards() -> Result<Vec<BoardState>> {
-    let db = Connection::open(DB_PATH)?;
+    let db = open_db()?;
+
     db.execute_batch(CREATE_SCHEMA)?;
 
     let mut boards = Vec::new();
@@ -168,15 +141,4 @@ pub fn run(persist_chan: Receiver<PersistMessage>) -> Result<JoinHandle<Result<(
         Ok(())
     });
     Ok(handle)
-}
-
-#[cfg(test)]
-mod scratch_verify_tests {
-    use super::*;
-
-    #[test]
-    fn scratch_load_boards_creates_schema() {
-        let boards = load_boards().expect("load_boards failed");
-        assert!(boards.is_empty());
-    }
 }

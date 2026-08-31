@@ -1,7 +1,6 @@
+use crate::{message::DirectionX, models::BoardState, persistence, ui::TextInputState};
 use color_eyre::{Result, eyre::OptionExt};
 use ratatui::widgets::ListState;
-
-use crate::{message::DirectionX, models::BoardState, persistence, ui::TextInputState};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 #[repr(u8)]
