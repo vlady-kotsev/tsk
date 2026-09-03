@@ -51,6 +51,7 @@ fn handle_key(key: event::KeyEvent) -> Option<Message> {
         KeyCode::Char('q') => Some(Message::Quit('q')),
         KeyCode::Char('l') => Some(Message::Direction(DirectionX::Right)),
         KeyCode::Char('h') => Some(Message::Direction(DirectionX::Left)),
+        KeyCode::Char('p') => Some(Message::ClipboardCopy),
         KeyCode::Char('c') => {
             if key.modifiers.contains(KeyModifiers::CONTROL) {
                 Some(Message::Quit('c'))

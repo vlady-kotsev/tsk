@@ -46,7 +46,7 @@ impl StatefulWidget for Board {
             .highlight_symbol("▶ ");
         StatefulWidget::render(list, body, buf, &mut state.list_state);
 
-        Paragraph::new(" j/k move   l open   h back   n new task   d delete   q quit ")
+        Paragraph::new(" j/k move   l open   h back   n new task   d delete   p copy   q quit ")
             .style(footer_style())
             .render(footer, buf);
     }

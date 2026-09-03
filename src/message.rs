@@ -24,4 +24,5 @@ pub enum Message {
     InputCancel,
     Delete,
     MoveOrder(DirectionY),
+    ClipboardCopy,
 }

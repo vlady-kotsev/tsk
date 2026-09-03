@@ -2,6 +2,7 @@ use color_eyre::eyre::Result;
 use ratatui::Terminal;
 use ratatui::backend::Backend;
 
+use crate::clipboard::Clipboard;
 use crate::event;
 use crate::message::{DirectionX, DirectionY, Message};
 use crate::models::{AppModelState, RunningState, ScreenState};
@@ -14,21 +15,22 @@ use std::sync::Arc;
 use std::sync::mpsc::{Sender, SyncSender, channel, sync_channel};
 use std::time;
 
-#[derive(Default)]
 pub struct App {
     model: AppModelState,
     done_sender: Option<SyncSender<()>>,
     persist_msg_sender: Option<Sender<PersistMessage>>,
+    clipboard: Clipboard,
 }
 
 impl App {
     pub fn new() -> Result<Self> {
         let model = AppModelState::load()?;
-
+        let clipboard = Clipboard::new()?;
         Ok(Self {
             model,
             done_sender: None,
             persist_msg_sender: None,
+            clipboard,
         })
     }
 
@@ -128,6 +130,7 @@ impl App {
                 self.model.set_is_inputing(false);
                 None
             }
+            Message::ClipboardCopy => Some(Message::Input('p')),
         }
     }
 
@@ -249,6 +252,27 @@ impl App {
                         }
                     }
                     _ => return None,
+                };
+                None
+            }
+            Message::ClipboardCopy => {
+                match self.model.screen_state() {
+                    ScreenState::AllBoards => {
+                        let board_index = self.model.list_state.selected()?;
+                        let board = self.model.get_board_at(board_index)?;
+                        self.clipboard.copy_to_clipboard(board.title()).ok()?;
+                    }
+                    ScreenState::Board(board_index) => {
+                        let board = self.model.get_board_at(board_index)?;
+                        let task_index = board.list_state.selected()?;
+                        let task = board.get_task_at(task_index)?;
+                        self.clipboard.copy_to_clipboard(task.content()).ok()?;
+                    }
+                    ScreenState::Task(board_index, task_index) => {
+                        let board = self.model.get_board_at(board_index)?;
+                        let task = board.get_task_at(task_index)?;
+                        self.clipboard.copy_to_clipboard(task.content()).ok()?;
+                    }
                 };
                 None
             }

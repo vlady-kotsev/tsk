@@ -52,7 +52,7 @@ impl StatefulWidget for AppModel<'_> {
             .highlight_symbol("▶ ");
         StatefulWidget::render(list, body, buf, &mut state.list_state);
 
-        Paragraph::new(" j/k move   l open   n new board   d delete   q quit ")
+        Paragraph::new(" j/k move   l open   n new board   d delete   p copy   q quit ")
             .style(footer_style())
             .render(footer, buf);
     }
