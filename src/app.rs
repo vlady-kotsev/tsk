@@ -231,10 +231,12 @@ impl App {
 
                         match direction_y {
                             DirectionY::Up => {
-                                board.swap_tasks(task_index, task_index.checked_sub_signed(1)?)
+                                board.list_state.select_previous();
+                                board.swap_tasks(task_index, task_index.checked_sub_signed(1)?);
                             }
                             DirectionY::Down => {
-                                board.swap_tasks(task_index, task_index.checked_add_signed(1)?)
+                                board.list_state.select_next();
+                                board.swap_tasks(task_index, task_index.checked_add_signed(1)?);
                             }
                         }
                     }
@@ -242,13 +244,17 @@ impl App {
                         let board_index = self.model.list_state.selected()?;
 
                         match direction_y {
-                            DirectionY::Up => self
-                                .model
-                                .swap_boards(board_index, board_index.checked_sub_signed(1)?),
+                            DirectionY::Up => {
+                                self.model.list_state.select_previous();
+                                self.model
+                                    .swap_boards(board_index, board_index.checked_sub_signed(1)?);
+                            }
 
-                            DirectionY::Down => self
-                                .model
-                                .swap_boards(board_index, board_index.checked_add_signed(1)?),
+                            DirectionY::Down => {
+                                self.model.list_state.select_next();
+                                self.model
+                                    .swap_boards(board_index, board_index.checked_add_signed(1)?);
+                            }
                         }
                     }
                     _ => return None,
