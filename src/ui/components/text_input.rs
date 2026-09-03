@@ -38,6 +38,7 @@ impl TextInputState {
     }
 
     pub fn reset(&mut self) {
+        self.text = Some(vec![]);
         self.cursor = 0;
     }
 
